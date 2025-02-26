@@ -1,11 +1,12 @@
 from PyQt5.QtWidgets import (QMainWindow, QTreeWidget, QTreeWidgetItem, QPushButton, 
                              QLabel, QVBoxLayout, QHBoxLayout, QWidget, QTableWidgetItem,
                              QSystemTrayIcon, QMenu, QAction, QDialog, QLineEdit,
-                             QTextEdit, QComboBox, QMessageBox, QInputDialog, QApplication)
+                             QTextEdit, QComboBox, QMessageBox, QInputDialog, QApplication,
+                             QFrame, QSplitter, QHeaderView, QStyleFactory)
 
-from PyQt5.QtCore import QTimer, Qt
-from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QTimer, QObject, pyqtSignal
+from PyQt5.QtCore import QTimer, Qt, QSize
+from PyQt5.QtGui import QIcon, QColor, QPalette, QFont, QBrush, QLinearGradient, QGradient, QPainter
+from PyQt5.QtCore import Qt, QTimer, QObject, pyqtSignal, QPropertyAnimation, QEasingCurve
 
 from database_manager import DatabaseManager
 from window_tracker import WindowTracker
@@ -18,6 +19,9 @@ import os
 class TimeTrackerApp(QMainWindow):
     def __init__(self):
         super().__init__()
+        
+        # Set the application style and theme
+        self.setup_theme()
         
         # Initialize components
         self.db_manager = DatabaseManager()
@@ -38,56 +42,192 @@ class TimeTrackerApp(QMainWindow):
         
         self.update_activity_display()
     
+    def setup_theme(self):
+        """Setup the application theme and styling"""
+        # Use Fusion style for a modern look
+        QApplication.setStyle(QStyleFactory.create("Fusion"))
+        
+        # Create a custom dark palette
+        palette = QPalette()
+        
+        # Set colors for various UI elements
+        palette.setColor(QPalette.Window, QColor(53, 53, 53))
+        palette.setColor(QPalette.WindowText, QColor(255, 255, 255))
+        palette.setColor(QPalette.Base, QColor(42, 42, 42))
+        palette.setColor(QPalette.AlternateBase, QColor(66, 66, 66))
+        palette.setColor(QPalette.ToolTipBase, QColor(25, 25, 25))
+        palette.setColor(QPalette.ToolTipText, QColor(255, 255, 255))
+        palette.setColor(QPalette.Text, QColor(255, 255, 255))
+        palette.setColor(QPalette.Button, QColor(53, 53, 53))
+        palette.setColor(QPalette.ButtonText, QColor(255, 255, 255))
+        palette.setColor(QPalette.Link, QColor(42, 130, 218))
+        palette.setColor(QPalette.Highlight, QColor(42, 130, 218))
+        palette.setColor(QPalette.HighlightedText, QColor(255, 255, 255))
+        
+        # Apply the palette
+        QApplication.setPalette(palette)
+    
     def init_ui(self):
         """Initialize the UI components"""
         # Create main layout
         main_layout = QVBoxLayout()
+        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(15, 15, 15, 15)
+        
+        # Create a header with app title
+        header = QLabel("TimeTracker")
+        header.setAlignment(Qt.AlignCenter)
+        header.setFont(QFont("Arial", 16, QFont.Bold))
+        header.setStyleSheet("color: #4FC3F7; margin-bottom: 10px;")
+        main_layout.addWidget(header)
+        
+        # Create a separator line
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background-color: #555; max-height: 1px;")
+        main_layout.addWidget(separator)
         
         # Create project selection area
-        project_layout = QHBoxLayout()
+        project_frame = QFrame()
+        project_frame.setStyleSheet("background-color: #333; border-radius: 5px; padding: 8px;")
+        project_layout = QHBoxLayout(project_frame)
+        project_layout.setContentsMargins(10, 10, 10, 10)
         
         # Project label and combo box
-        project_layout.addWidget(QLabel("Project:"))
+        project_label = QLabel("Project:")
+        project_label.setStyleSheet("font-weight: bold; color: #4FC3F7;")
+        project_layout.addWidget(project_label)
+        
         self.project_combo = QComboBox()
+        self.project_combo.setMinimumWidth(200)
+        self.project_combo.setStyleSheet("""
+            QComboBox {
+                border: 1px solid #555;
+                border-radius: 3px;
+                padding: 5px;
+                background-color: #3C3C3C;
+                color: white;
+            }
+            QComboBox::drop-down {
+                subcontrol-origin: padding;
+                subcontrol-position: top right;
+                width: 15px;
+                border-left: 1px solid #555;
+            }
+        """)
         self.project_combo.currentIndexChanged.connect(self.on_project_changed)
         project_layout.addWidget(self.project_combo)
         
         # Project management buttons
+        button_style = """
+            QPushButton {
+                background-color: #444;
+                color: white;
+                border: none;
+                padding: 5px 10px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #555;
+            }
+            QPushButton:pressed {
+                background-color: #333;
+            }
+        """
+        
         self.new_project_btn = QPushButton("New Project")
+        self.new_project_btn.setStyleSheet(button_style + "background-color: #2196F3;")
         self.new_project_btn.clicked.connect(self.create_project_dialog)
         project_layout.addWidget(self.new_project_btn)
         
         self.edit_project_btn = QPushButton("Edit")
+        self.edit_project_btn.setStyleSheet(button_style)
         self.edit_project_btn.clicked.connect(self.edit_project_dialog)
         project_layout.addWidget(self.edit_project_btn)
         
         self.delete_project_btn = QPushButton("Delete")
+        self.delete_project_btn.setStyleSheet(button_style)
         self.delete_project_btn.clicked.connect(self.delete_project_dialog)
         project_layout.addWidget(self.delete_project_btn)
         
-        main_layout.addLayout(project_layout)
+        main_layout.addWidget(project_frame)
         
         # Create tracking control area
-        tracking_layout = QHBoxLayout()
+        tracking_frame = QFrame()
+        tracking_frame.setStyleSheet("background-color: #333; border-radius: 5px; padding: 8px;")
+        tracking_layout = QHBoxLayout(tracking_frame)
+        tracking_layout.setContentsMargins(10, 10, 10, 10)
         
         self.tracking_btn = QPushButton("Start Tracking")
+        self.tracking_btn.setMinimumHeight(40)
+        self.tracking_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 8px 16px;
+                font-weight: bold;
+                border-radius: 3px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #66BB6A;
+            }
+            QPushButton:pressed {
+                background-color: #388E3C;
+            }
+        """)
         self.tracking_btn.clicked.connect(self.toggle_tracking)
         tracking_layout.addWidget(self.tracking_btn)
         
         self.tracking_status = QLabel("Tracking stopped")
+        self.tracking_status.setStyleSheet("color: #EF5350; font-style: italic;")
         tracking_layout.addWidget(self.tracking_status)
         tracking_layout.addStretch()
         
-        main_layout.addLayout(tracking_layout)
+        main_layout.addWidget(tracking_frame)
         
         # Create activity tree widget
+        activity_label = QLabel("Today's Activities")
+        activity_label.setStyleSheet("color: #4FC3F7; font-weight: bold; font-size: 14px; margin-top: 10px;")
+        activity_label.setAlignment(Qt.AlignLeft)
+        main_layout.addWidget(activity_label)
+        
         self.activity_table = QTreeWidget()
         self.activity_table.setColumnCount(2)
         self.activity_table.setHeaderLabels(["Application", "Duration"])
         self.activity_table.setAlternatingRowColors(True)
+        self.activity_table.setStyleSheet("""
+            QTreeWidget {
+                background-color: #2D2D2D;
+                alternate-background-color: #353535;
+                border: 1px solid #555;
+                border-radius: 3px;
+                padding: 5px;
+                color: white;
+            }
+            QTreeWidget::item {
+                padding: 5px;
+                border-bottom: 1px solid #444;
+            }
+            QTreeWidget::item:selected {
+                background-color: #2196F3;
+            }
+            QHeaderView::section {
+                background-color: #333;
+                padding: 6px;
+                border: 1px solid #555;
+                color: white;
+                font-weight: bold;
+            }
+        """)
         self.activity_table.header().setStretchLastSection(True)
         self.activity_table.setColumnWidth(0, 300)
         self.activity_table.itemClicked.connect(self.on_item_clicked)
+        self.activity_table.setAnimated(True)
+        self.activity_table.setIndentation(20)
+        self.activity_table.header().setSectionResizeMode(QHeaderView.Interactive)
         
         main_layout.addWidget(self.activity_table)
         
@@ -97,8 +237,8 @@ class TimeTrackerApp(QMainWindow):
         self.setCentralWidget(container)
         
         # Set window properties
-        self.setWindowTitle("Python Time Tracker")
-        self.setGeometry(100, 100, 800, 600)
+        self.setWindowTitle("TimeTracker - Productivity Analyzer")
+        self.setGeometry(100, 100, 900, 700)
     
     def update_project_combo(self):
         """Update the project selection dropdown"""
@@ -124,26 +264,91 @@ class TimeTrackerApp(QMainWindow):
         dialog = QDialog(self)
         dialog.setWindowTitle("Create New Project")
         dialog.setFixedWidth(400)
+        dialog.setStyleSheet("""
+            QDialog {
+                background-color: #333;
+                color: white;
+            }
+            QLabel {
+                color: white;
+                font-weight: bold;
+                margin-top: 5px;
+            }
+            QLineEdit, QTextEdit {
+                background-color: #444;
+                color: white;
+                border: 1px solid #555;
+                border-radius: 3px;
+                padding: 5px;
+            }
+            QPushButton {
+                background-color: #444;
+                color: white;
+                border: none;
+                padding: 8px 15px;
+                border-radius: 3px;
+                min-width: 100px;
+            }
+            QPushButton:hover {
+                background-color: #555;
+            }
+            QPushButton:pressed {
+                background-color: #333;
+            }
+        """)
         
         layout = QVBoxLayout()
+        layout.setSpacing(10)
+        layout.setContentsMargins(20, 20, 20, 20)
+        
+        # Header
+        header = QLabel("Create New Project")
+        header.setStyleSheet("font-size: 16px; color: #4FC3F7; margin-bottom: 15px;")
+        header.setAlignment(Qt.AlignCenter)
+        layout.addWidget(header)
+        
+        # Separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setFrameShadow(QFrame.Sunken)
+        separator.setStyleSheet("background-color: #555; max-height: 1px; margin-bottom: 15px;")
+        layout.addWidget(separator)
         
         name_label = QLabel("Project Name:")
         layout.addWidget(name_label)
         
         name_input = QLineEdit()
+        name_input.setPlaceholderText("Enter project name...")
         layout.addWidget(name_input)
         
         desc_label = QLabel("Description:")
         layout.addWidget(desc_label)
         
         desc_input = QTextEdit()
-        desc_input.setMaximumHeight(80)
+        desc_input.setMaximumHeight(100)
+        desc_input.setPlaceholderText("Enter project description...")
         layout.addWidget(desc_input)
         
         button_layout = QHBoxLayout()
+        button_layout.setContentsMargins(0, 20, 0, 0)
+        
         cancel_btn = QPushButton("Cancel")
         cancel_btn.clicked.connect(dialog.reject)
+        
         create_btn = QPushButton("Create")
+        create_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2196F3;
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #42A5F5;
+            }
+            QPushButton:pressed {
+                background-color: #1E88E5;
+            }
+        """)
         create_btn.clicked.connect(lambda: self.finish_create_project(name_input.text(), desc_input.toPlainText(), dialog))
         
         button_layout.addWidget(cancel_btn)
@@ -286,11 +491,47 @@ class TimeTrackerApp(QMainWindow):
             self.window_tracker.current_project_id = self.current_project_id
             self.window_tracker.start_tracking()
             self.tracking_btn.setText("Stop Tracking")
+            self.tracking_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #F44336;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    font-weight: bold;
+                    border-radius: 3px;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #EF5350;
+                }
+                QPushButton:pressed {
+                    background-color: #D32F2F;
+                }
+            """)
             self.tracking_status.setText("Tracking active...")
+            self.tracking_status.setStyleSheet("color: #4CAF50; font-style: italic;")
         else:
             self.window_tracker.stop_tracking()
             self.tracking_btn.setText("Start Tracking")
+            self.tracking_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #4CAF50;
+                    color: white;
+                    border: none;
+                    padding: 8px 16px;
+                    font-weight: bold;
+                    border-radius: 3px;
+                    font-size: 14px;
+                }
+                QPushButton:hover {
+                    background-color: #66BB6A;
+                }
+                QPushButton:pressed {
+                    background-color: #388E3C;
+                }
+            """)
             self.tracking_status.setText("Tracking stopped")
+            self.tracking_status.setStyleSheet("color: #EF5350; font-style: italic;")
     
     def on_activity_changed(self, activity):
         """Handle activity change event from tracker"""
@@ -299,8 +540,16 @@ class TimeTrackerApp(QMainWindow):
         # Save the activity to the database
         self.db_manager.save_activity(activity)
         
-        # Update status and refresh view
-        self.tracking_status.setText(f"Tracking: {activity['name']} - {activity['short_title']}")
+        # Update status with styled text and refresh view
+        status_text = f"Tracking: {activity['name']} - {activity['short_title']}"
+        self.tracking_status.setText(status_text)
+        self.tracking_status.setStyleSheet("""
+            color: #4CAF50;
+            font-style: italic;
+            background-color: rgba(76, 175, 80, 0.1);
+            border-radius: 3px;
+            padding: 3px;
+        """)
         self.update_activity_display()
     
     def update_activity_display(self):
@@ -334,6 +583,15 @@ class TimeTrackerApp(QMainWindow):
         # Get hierarchical activity data
         activities = self.db_manager.get_today_activities_hierarchical(self.current_project_id)
         
+        # Font settings
+        app_font = QFont()
+        app_font.setBold(True)
+        app_font.setPointSize(10)
+        
+        domain_font = QFont()
+        domain_font.setBold(True)
+        domain_font.setPointSize(9)
+        
         for app_data in activities:
             # Create app-level item
             app_item = QTreeWidgetItem(self.activity_table)
@@ -341,6 +599,11 @@ class TimeTrackerApp(QMainWindow):
             app_item.setText(0, app_name)
             app_item.setText(1, app_data["duration_formatted"])
             app_item.setData(0, Qt.UserRole, "app")  # Tag as an app item
+            
+            # Style the app item
+            app_item.setFont(0, app_font)
+            app_item.setForeground(0, QBrush(QColor("#4FC3F7")))  # Light blue
+            app_item.setForeground(1, QBrush(QColor("#4FC3F7")))
             
             # Restore app expansion state
             if app_name in expanded_apps:
@@ -356,6 +619,11 @@ class TimeTrackerApp(QMainWindow):
                     domain_item.setText(1, domain["duration_formatted"])
                     domain_item.setData(0, Qt.UserRole, "domain")  # Tag as a domain item
                     
+                    # Style the domain item
+                    domain_item.setFont(0, domain_font)
+                    domain_item.setForeground(0, QBrush(QColor("#FFD54F")))  # Light amber
+                    domain_item.setForeground(1, QBrush(QColor("#FFD54F")))
+                    
                     # Restore domain expansion state
                     key = f"{app_name}|{domain_name}"
                     if key in expanded_domains:
@@ -369,9 +637,13 @@ class TimeTrackerApp(QMainWindow):
                             site_item.setText(0, website["window_title"])
                             site_item.setText(1, website["duration_formatted"])
                             site_item.setData(0, Qt.UserRole, "website")  # Tag as a website item
+                            
+                            # Style the website item
+                            site_item.setForeground(0, QBrush(QColor("#FFFFFF")))  # White
+                            site_item.setForeground(1, QBrush(QColor("#AAAAAA")))  # Light gray
         
         # Set column widths
-        self.activity_table.setColumnWidth(0, 300)
+        self.activity_table.setColumnWidth(0, 400)
 
     def on_item_clicked(self, item, column):
         """Handle clicks on tree items to expand/collapse"""
