@@ -320,14 +320,23 @@ class TimeTrackerApp(QMainWindow):
             app_item.setText(1, app_data["duration_formatted"])
             app_item.setData(0, Qt.UserRole, "app")  # Tag as an app item
             
-            # Show child items for all applications, not just Chrome
+            # Show child items for all applications
             if app_data["children"]:
-                for website in app_data["children"]:
-                    # Create window/website-level item
-                    site_item = QTreeWidgetItem(app_item)
-                    site_item.setText(0, website["window_title"])
-                    site_item.setText(1, website["duration_formatted"])
-                    site_item.setData(0, Qt.UserRole, "website")  # Tag as a website item
+                for domain in app_data["children"]:
+                    # Create domain-level item
+                    domain_item = QTreeWidgetItem(app_item)
+                    domain_item.setText(0, domain["domain_info"])
+                    domain_item.setText(1, domain["duration_formatted"])
+                    domain_item.setData(0, Qt.UserRole, "domain")  # Tag as a domain item
+                    
+                    # Add individual websites/window titles under domain
+                    if "children" in domain:
+                        for website in domain["children"]:
+                            # Create website-level item
+                            site_item = QTreeWidgetItem(domain_item)
+                            site_item.setText(0, website["window_title"])
+                            site_item.setText(1, website["duration_formatted"])
+                            site_item.setData(0, Qt.UserRole, "website")  # Tag as a website item
         
         # Set column widths
         self.activity_table.setColumnWidth(0, 300)
@@ -336,8 +345,8 @@ class TimeTrackerApp(QMainWindow):
         """Handle clicks on tree items to expand/collapse"""
         item_type = item.data(0, Qt.UserRole)
         
-        # Only handle app-level items
-        if item_type == "app":
+        # Handle any expandable items (app and domain)
+        if item_type in ["app", "domain"]:
             # Toggle expansion
             if item.isExpanded():
                 item.setExpanded(False)

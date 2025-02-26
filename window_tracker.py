@@ -51,11 +51,12 @@ class WindowTracker(QObject):
     def _track_windows(self):
         last_window_title = None
         last_app_name = None
+        last_domain_info = None
         
         try:
             while not self.stop_event.is_set():
                 current_window_handle = win32gui.GetForegroundWindow()
-                app_name, window_title = self._get_window_info(current_window_handle)
+                app_name, window_title, domain_info = self._get_window_info(current_window_handle)
                 
                 # Skip empty window titles (typically system windows)
                 if not window_title.strip():
@@ -83,6 +84,7 @@ class WindowTracker(QObject):
                         "name": app_name,
                         "window_title": window_title,
                         "short_title": short_title,
+                        "domain_info": domain_info,  # Add domain info for grouping
                         "start_time": datetime.datetime.now(),
                         "end_time": datetime.datetime.now(),  # Will be updated when window changes
                         "duration_formatted": "0s"
@@ -90,6 +92,7 @@ class WindowTracker(QObject):
                     
                     last_window_title = window_title
                     last_app_name = app_name
+                    last_domain_info = domain_info
                 elif self.current_activity:
                     # Update end time for current activity
                     self.current_activity["end_time"] = datetime.datetime.now()
@@ -104,19 +107,22 @@ class WindowTracker(QObject):
         window_title = win32gui.GetWindowText(hwnd)
         
         app_name = "Unknown"
+        domain_info = "Other"
         try:
             _, pid = win32process.GetWindowThreadProcessId(hwnd)
             if pid > 0:
                 process = psutil.Process(pid)
                 app_name = process.name().replace('.exe', '')
                 
-                # Clean browser titles for better tab detection
-                window_title = self._clean_browser_title(app_name, window_title)
+                # Clean browser titles and get domain info for better grouping
+                if app_name.lower() in ['chrome', 'msedge', 'firefox', 'opera']:
+                    cleaned_title, domain_info = self._clean_browser_title(app_name, window_title)
+                    window_title = cleaned_title
                 
         except Exception as e:
             print(f"Error getting process info: {e}")
         
-        return app_name, window_title
+        return app_name, window_title, domain_info
 
     def _clean_browser_title(self, app_name, window_title):
         """Clean and standardize browser tab titles"""
@@ -130,15 +136,48 @@ class WindowTracker(QObject):
         
         # Check if this is a known browser
         app_lower = app_name.lower()
+        cleaned_title = window_title
+        
         for browser, suffixes in browser_suffixes.items():
             if app_lower == browser:
                 # Remove the browser name suffix from the title
                 for suffix in suffixes:
                     if window_title.endswith(suffix):
-                        return window_title[:-len(suffix)].strip()
+                        cleaned_title = window_title[:-len(suffix)].strip()
         
-        # If no suffix matched or it's not a browser, return the original title
-        return window_title
+        # Extract the domain info and original title
+        domain_info = self._extract_domain_info(cleaned_title)
+        
+        return cleaned_title, domain_info
+    
+    def _extract_domain_info(self, window_title):
+        """Extract domain information from window title for grouping similar sites"""
+        # Common sites and their identifiers
+        site_patterns = {
+            'Reddit': [' : r/', 'r/'],
+            'YouTube': ['- YouTube', 'YouTube'],
+            'LinkedIn': ['| LinkedIn', 'LinkedIn'],
+            'Twitter': ['/ X', '| X', 'Twitter'],
+            'Facebook': ['| Facebook', 'Facebook'],
+            'GitHub': ['GitHub'],
+            'Google': ['Google'],
+            'Gmail': ['Gmail'],
+            'Amazon': ['Amazon'],
+            'Stack Overflow': ['Stack Overflow'],
+            'Medium': ['Medium'],
+            'Wikipedia': ['Wikipedia'],
+            'Netflix': ['Netflix'],
+            'Twitch': ['Twitch']
+        }
+        
+        # Check for each site pattern
+        for site_name, patterns in site_patterns.items():
+            for pattern in patterns:
+                if pattern in window_title:
+                    return site_name
+        
+        # If no match found, default to "Other"
+        return "Other"
 
     def _format_duration(self, duration):
         total_seconds = int(duration.total_seconds())
