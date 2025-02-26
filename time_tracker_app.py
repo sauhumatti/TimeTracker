@@ -29,11 +29,21 @@ class TimeTrackerApp(QMainWindow):
         self.window_tracker.activity_changed.connect(self.on_activity_changed)
         
         self.is_tracking = False
-        self.current_project_id = 1  # Default project ID
+        
+        # Load projects and set current project
         self.projects = self.db_manager.get_projects()
+        
+        # Set default project ID - if no projects, will be set in update_project_combo
+        if self.projects:
+            self.current_project_id = self.projects[0]["id"]
+        else:
+            self.current_project_id = None
         
         self.init_ui()
         self.setup_system_tray()
+        
+        # Update the project combo to ensure we have a valid project
+        self.update_project_combo()
         
         # Set up timer to refresh data periodically
         self.refresh_timer = QTimer(self)
@@ -245,13 +255,27 @@ class TimeTrackerApp(QMainWindow):
         self.project_combo.clear()
         self.projects = self.db_manager.get_projects()
         
+        # Ensure there's at least one project (the default project)
+        if not self.projects:
+            # Create the default project if it doesn't exist
+            default_id = self.db_manager.create_project("Default Project", "Default project for all activities")
+            self.current_project_id = default_id
+            self.projects = self.db_manager.get_projects()
+        
         selected_index = 0
         for i, project in enumerate(self.projects):
             self.project_combo.addItem(project["name"], project["id"])
             if project["id"] == self.current_project_id:
                 selected_index = i
         
-        self.project_combo.setCurrentIndex(selected_index)
+        # Set the current index and ensure it's valid
+        if self.projects and selected_index >= 0 and selected_index < len(self.projects):
+            self.project_combo.setCurrentIndex(selected_index)
+            self.current_project_id = self.projects[selected_index]["id"]
+        elif self.projects:
+            # If current_project_id isn't found, default to the first project
+            self.project_combo.setCurrentIndex(0)
+            self.current_project_id = self.projects[0]["id"]
     
     def on_project_changed(self, index):
         """Handle project selection change"""

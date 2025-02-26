@@ -10,7 +10,9 @@ class DatabaseManager:
 
     def initialize_database(self):
         """Create the database file and tables if they don't exist"""
-        if not os.path.exists(self.db_filename):
+        is_new_db = not os.path.exists(self.db_filename)
+        
+        if is_new_db:
             conn = sqlite3.connect(self.db_filename)
             cursor = conn.cursor()
             
