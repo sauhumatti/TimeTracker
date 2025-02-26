@@ -320,10 +320,10 @@ class TimeTrackerApp(QMainWindow):
             app_item.setText(1, app_data["duration_formatted"])
             app_item.setData(0, Qt.UserRole, "app")  # Tag as an app item
             
-            # For chrome, we'll expand to show websites
-            if app_data["name"].lower() == "chrome":
+            # Show child items for all applications, not just Chrome
+            if app_data["children"]:
                 for website in app_data["children"]:
-                    # Create website-level item
+                    # Create window/website-level item
                     site_item = QTreeWidgetItem(app_item)
                     site_item.setText(0, website["window_title"])
                     site_item.setText(1, website["duration_formatted"])

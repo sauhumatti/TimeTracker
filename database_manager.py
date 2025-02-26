@@ -456,13 +456,9 @@ class DatabaseManager:
         })
         
         for activity in activities:
-            # For browsers, we want to track each tab separately
-            if activity["name"].lower() in ['chrome', 'msedge', 'firefox', 'opera']:
-                # We use both the app name and the full window title as the key
-                key = (activity["name"], activity["window_title"])
-            else:
-                # For other apps, just use app name and window title
-                key = (activity["name"], activity["window_title"])
+            # For all applications, track each window title separately
+            # We use both the app name and the full window title as the key
+            key = (activity["name"], activity["window_title"])
             
             if key not in aggregated or activity["start_time"] < aggregated[key]["start_time"]:
                 aggregated[key]["start_time"] = activity["start_time"]
