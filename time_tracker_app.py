@@ -305,6 +305,27 @@ class TimeTrackerApp(QMainWindow):
     
     def update_activity_display(self):
         """Update the activity display with hierarchical data"""
+        # Store the expanded state before clearing
+        expanded_apps = {}
+        expanded_domains = {}
+        
+        # Save expanded state
+        root = self.activity_table.invisibleRootItem()
+        for i in range(root.childCount()):
+            app_item = root.child(i)
+            app_name = app_item.text(0)
+            if app_item.isExpanded():
+                expanded_apps[app_name] = True
+                
+                # Save expanded state of domains
+                for j in range(app_item.childCount()):
+                    domain_item = app_item.child(j)
+                    domain_name = domain_item.text(0)
+                    key = f"{app_name}|{domain_name}"
+                    if domain_item.isExpanded():
+                        expanded_domains[key] = True
+        
+        # Clear and rebuild the tree
         self.activity_table.clear()
         
         if not self.db_manager:
@@ -316,18 +337,29 @@ class TimeTrackerApp(QMainWindow):
         for app_data in activities:
             # Create app-level item
             app_item = QTreeWidgetItem(self.activity_table)
-            app_item.setText(0, app_data["name"])
+            app_name = app_data["name"]
+            app_item.setText(0, app_name)
             app_item.setText(1, app_data["duration_formatted"])
             app_item.setData(0, Qt.UserRole, "app")  # Tag as an app item
+            
+            # Restore app expansion state
+            if app_name in expanded_apps:
+                app_item.setExpanded(True)
             
             # Show child items for all applications
             if app_data["children"]:
                 for domain in app_data["children"]:
                     # Create domain-level item
                     domain_item = QTreeWidgetItem(app_item)
-                    domain_item.setText(0, domain["domain_info"])
+                    domain_name = domain["domain_info"]
+                    domain_item.setText(0, domain_name)
                     domain_item.setText(1, domain["duration_formatted"])
                     domain_item.setData(0, Qt.UserRole, "domain")  # Tag as a domain item
+                    
+                    # Restore domain expansion state
+                    key = f"{app_name}|{domain_name}"
+                    if key in expanded_domains:
+                        domain_item.setExpanded(True)
                     
                     # Add individual websites/window titles under domain
                     if "children" in domain:

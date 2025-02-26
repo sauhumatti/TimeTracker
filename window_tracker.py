@@ -107,7 +107,7 @@ class WindowTracker(QObject):
         window_title = win32gui.GetWindowText(hwnd)
         
         app_name = "Unknown"
-        domain_info = "Other"
+        domain_info = None
         try:
             _, pid = win32process.GetWindowThreadProcessId(hwnd)
             if pid > 0:
@@ -118,6 +118,10 @@ class WindowTracker(QObject):
                 if app_name.lower() in ['chrome', 'msedge', 'firefox', 'opera']:
                     cleaned_title, domain_info = self._clean_browser_title(app_name, window_title)
                     window_title = cleaned_title
+                else:
+                    # For non-browser apps, use the app name as the domain
+                    # This ensures they're not grouped under "Other"
+                    domain_info = app_name
                 
         except Exception as e:
             print(f"Error getting process info: {e}")
